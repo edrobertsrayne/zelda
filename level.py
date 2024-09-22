@@ -1,7 +1,9 @@
 import pygame
 from tile import Tile
 from player import Player
-from settings import TILESIZE, WORLD_MAP
+from settings import TILESIZE
+from support import import_csv_layout, import_folder
+from random import choice
 
 
 class Level:
@@ -12,16 +14,44 @@ class Level:
         self.create_map()
 
     def create_map(self):
-        for row_index, row in enumerate(WORLD_MAP):
-            for col_index, col in enumerate(row):
-                x = col_index * TILESIZE
-                y = row_index * TILESIZE
-                if col == "x":
-                    Tile((x, y), [self.visible_sprites, self.obstacle_sprites])
-                elif col == "p":
-                    self.player = Player(
-                        (x, y), [self.visible_sprites], self.obstacle_sprites
-                    )
+        layouts = {
+            "boundary": import_csv_layout("map/map_FloorBlocks.csv"),
+            "grass": import_csv_layout("map/map_Grass.csv"),
+            "object": import_csv_layout("map/map_Objects.csv"),
+        }
+        graphics = {
+            "grass": import_folder("graphics/grass"),
+            "objects": import_folder("graphics/objects"),
+        }
+        for style, layout in layouts.items():
+            for row_index, row in enumerate(layout):
+                for col_index, col in enumerate(row):
+                    if col != "-1":
+                        x = col_index * TILESIZE
+                        y = row_index * TILESIZE
+                        if style == "boundary":
+                            Tile(
+                                (x, y),
+                                [self.obstacle_sprites],
+                                "invisible",
+                            )
+                        if style == "grass":
+                            Tile(
+                                (x, y),
+                                [self.visible_sprites, self.obstacle_sprites],
+                                "grass",
+                                choice(graphics["grass"]),
+                            )
+                        if style == "object":
+                            Tile(
+                                (x, y),
+                                [self.visible_sprites, self.obstacle_sprites],
+                                "object",
+                                graphics["objects"][int(col)],
+                            )
+        self.player = Player(
+            (2000, 1430), [self.visible_sprites], self.obstacle_sprites
+        )
 
     def run(self):
         self.visible_sprites.custom_draw(self.player)
@@ -37,9 +67,16 @@ class YSortCameraGroup(pygame.sprite.Group):
 
         self.offset = pygame.math.Vector2()
 
+        self.floor_surf = pygame.image.load("graphics/tilemap/ground.png").convert()
+        self.floor_rect = self.floor_surf.get_rect(topleft=(0, 0))
+
     def custom_draw(self, player):
         self.offset.x = player.rect.centerx - self.half_width
         self.offset.y = player.rect.centery - self.half_height
+
+        self.display_surface.blit(
+            self.floor_surf, self.floor_rect.topleft - self.offset
+        )
 
         for sprite in sorted(self.sprites(), key=lambda sprite: sprite.rect.centery):
             offset_pos = sprite.rect.topleft - self.offset
